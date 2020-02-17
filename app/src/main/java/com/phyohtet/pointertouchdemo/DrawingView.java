@@ -4,14 +4,18 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.widget.Toast;
 
 public class DrawingView extends SurfaceView {
 
     public enum Direction {
-        TOP, RIGHT, BOTTOM, LEFT
+        TOP, RIGHT, BOTTOM, LEFT, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT
     }
 
     public interface OnFinalActionListener {
@@ -32,6 +36,18 @@ public class DrawingView extends SurfaceView {
 
     private OnFinalActionListener onFinalActionListener;
 
+    private Direction direction;
+
+    private Vibrator vibrator;
+
+    public void setOnFinalActionListener(OnFinalActionListener onFinalActionListener) {
+        this.onFinalActionListener = onFinalActionListener;
+    }
+
+    public void setTriggerFinalAction(boolean triggerFinalAction) {
+        this.triggerFinalAction = triggerFinalAction;
+    }
+
     public DrawingView(Context context) {
         super(context);
         this.surfaceHolder = getHolder();
@@ -39,6 +55,8 @@ public class DrawingView extends SurfaceView {
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4);
         setZOrderOnTop(true);
+
+        vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
     }
 
     @Override
@@ -52,9 +70,6 @@ public class DrawingView extends SurfaceView {
             case MotionEvent.ACTION_MOVE:
                 float x = event.getX();
                 float y = event.getY();
-
-                //Log.d("TAG", "X : " + x);
-                //Log.d("TAG", "Y : " + y);
 
                 checkMove(x, y);
                 break;
@@ -76,7 +91,7 @@ public class DrawingView extends SurfaceView {
         if (nextControl) {
             determineDirection(x, y);
         } else {
-            if (((x > touchX) && (x >= tXP)) || ((y > touchY) && (y >= tYP))) {
+            /*if (((x > touchX) && (x >= tXP)) || ((y > touchY) && (y >= tYP))) {
                 //Toast.makeText(getContext(), "Triggered Next", Toast.LENGTH_SHORT).show();
                 clearCanvas();
                 nextControl = true;
@@ -86,6 +101,20 @@ public class DrawingView extends SurfaceView {
                 clearCanvas();
                 nextControl = true;
                 drawControl(x, y);
+            }*/
+
+            if (((x < touchX) && (x <= tXN)) && ((y < touchY) && (y <= tYN))) {
+                direction = Direction.TOP_LEFT;
+                drawNextControl(x, y);
+            } else if (((x > touchX) && (x >= tXP)) && ((y < touchY) && (y <= tYN))) {
+                direction = Direction.TOP_RIGHT;
+                drawNextControl(x, y);
+            } else if((x < touchX) && (x <= tXN) && ((y > touchY) && (y >= tYP))) {
+                direction = Direction.BOTTOM_LEFT;
+                drawNextControl(x, y);
+            } else if (((x > touchX) && (x >= tXP)) && ((y > touchY) && (y >= tYP))) {
+                direction = Direction.BOTTOM_RIGHT;
+                drawNextControl(x, y);
             }
         }
     }
@@ -98,19 +127,31 @@ public class DrawingView extends SurfaceView {
 
         if (onFinalActionListener != null && !triggerFinalAction) {
             if (y <= tYN) {
+                vibrate();
                 triggerFinalAction = true;
                 onFinalActionListener.onAction(Direction.TOP);
             } else if (x >= tXP) {
+                vibrate();
                 triggerFinalAction = true;
                 onFinalActionListener.onAction(Direction.RIGHT);
             } else if (y >= tYP) {
+                vibrate();
                 triggerFinalAction = true;
                 onFinalActionListener.onAction(Direction.BOTTOM);
             } else if (x <= tXN) {
+                vibrate();
                 triggerFinalAction = true;
                 onFinalActionListener.onAction(Direction.LEFT);
             }
         }
+    }
+
+    private void drawNextControl(float x, float y) {
+        clearCanvas();
+        nextControl = true;
+        drawControl(x, y);
+
+        vibrate();
     }
 
     private void drawControl(float x, float y) {
@@ -121,6 +162,13 @@ public class DrawingView extends SurfaceView {
             canvas.drawColor(Color.WHITE);
             canvas.drawCircle(x, y, RADIUS, paint);
             if (nextControl) {
+
+                if (direction != null) {
+                    Toast.makeText(getContext(), direction.name(), Toast.LENGTH_SHORT).show();
+
+                    // TODO implement next remote control by using Direction
+                }
+
                 float half = RADIUS / 1.4f;
                 canvas.drawLine(x - half, y - half, x + half, y + half, paint);
                 canvas.drawLine(x - half, y + half, x + half, y - half, paint);
@@ -144,11 +192,12 @@ public class DrawingView extends SurfaceView {
         triggerFinalAction = false;
     }
 
-    public void setOnFinalActionListener(OnFinalActionListener onFinalActionListener) {
-        this.onFinalActionListener = onFinalActionListener;
+    private void vibrate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE));
+        } else {
+            vibrator.vibrate(100);
+        }
     }
 
-    public void setTriggerFinalAction(boolean triggerFinalAction) {
-        this.triggerFinalAction = triggerFinalAction;
-    }
 }
